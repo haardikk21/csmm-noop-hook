@@ -53,7 +53,28 @@ contract CSMMTest is Test, Deployers {
             hookAddress,
             1000 ether
         );
-        hook.addLiquidity(key, 1e18);
+
+        hook.addLiquidity(key, 1000e18);
+    }
+
+    function test_claimTokenBalances() public {
+        // We add 1000 * (10^18) of liquidity of each token to the CSMM pool
+        // The actual tokens will move into the PM
+        // But the hook should get equivalent amount of claim tokens for each token
+        uint token0ClaimID = CurrencyLibrary.toId(currency0);
+        uint token1ClaimID = CurrencyLibrary.toId(currency1);
+
+        uint token0ClaimsBalance = manager.balanceOf(
+            address(hook),
+            token0ClaimID
+        );
+        uint token1ClaimsBalance = manager.balanceOf(
+            address(hook),
+            token1ClaimID
+        );
+
+        assertEq(token0ClaimsBalance, 1000e18);
+        assertEq(token1ClaimsBalance, 1000e18);
     }
 
     function test_cannotModifyLiquidity() public {
@@ -84,6 +105,32 @@ contract CSMMTest is Test, Deployers {
             IPoolManager.SwapParams({
                 zeroForOne: true,
                 amountSpecified: -100e18,
+                sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            }),
+            settings,
+            ZERO_BYTES
+        );
+        uint balanceOfTokenAAfter = key.currency0.balanceOfSelf();
+        uint balanceOfTokenBAfter = key.currency1.balanceOfSelf();
+
+        assertEq(balanceOfTokenBAfter - balanceOfTokenBBefore, 100e18);
+        assertEq(balanceOfTokenABefore - balanceOfTokenAAfter, 100e18);
+    }
+
+    function test_swap_exactOutput_zeroForOne() public {
+        PoolSwapTest.TestSettings memory settings = PoolSwapTest.TestSettings({
+            takeClaims: false,
+            settleUsingBurn: false
+        });
+
+        // Swap exact output 100 Token A
+        uint balanceOfTokenABefore = key.currency0.balanceOfSelf();
+        uint balanceOfTokenBBefore = key.currency1.balanceOfSelf();
+        swapRouter.swap(
+            key,
+            IPoolManager.SwapParams({
+                zeroForOne: true,
+                amountSpecified: 100e18,
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),
             settings,

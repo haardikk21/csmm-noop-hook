@@ -68,60 +68,16 @@ contract CSMM is BaseHook {
 
     // Custom add liquidity function
     function addLiquidity(PoolKey calldata key, uint256 amountEach) external {
-        poolManager.unlock(
-            abi.encode(
-                CallbackData(
-                    amountEach,
-                    key.currency0,
-                    key.currency1,
-                    msg.sender
-                )
-            )
-        );
-    }
-
-    function unlockCallback(
-        bytes calldata data
-    ) external override poolManagerOnly returns (bytes memory) {
-        CallbackData memory callbackData = abi.decode(data, (CallbackData));
-
-        // Settle `amountEach` of each currency from the sender
-        // i.e. Create a debit of `amountEach` of each currency with the Pool Manager
-        callbackData.currency0.settle(
-            poolManager,
-            callbackData.sender,
-            callbackData.amountEach,
-            false // `burn` = `false` i.e. we're actually transferring tokens, not burning ERC-6909 Claim Tokens
-        );
-        callbackData.currency1.settle(
-            poolManager,
-            callbackData.sender,
-            callbackData.amountEach,
-            false
-        );
-
-        // Since we didn't go through the regular "modify liquidity" flow,
-        // the PM just has a debit of `amountEach` of each currency from us
-        // We can, in exchange, get back ERC-6909 claim tokens for `amountEach` of each currency
-        // to create a credit of `amountEach` of each currency to us
-        // that balances out the debit
-
-        // We will store those claim tokens with the hook, so when swaps take place
-        // liquidity from our CSMM can be used by minting/burning claim tokens the hook owns
-        callbackData.currency0.take(
-            poolManager,
+        IERC20Minimal(Currency.unwrap(key.currency0)).transferFrom(
+            msg.sender,
             address(this),
-            callbackData.amountEach,
-            true // true = mint claim tokens for the hook, equivalent to money we just deposited to the PM
+            amountEach
         );
-        callbackData.currency1.take(
-            poolManager,
+        IERC20Minimal(Currency.unwrap(key.currency1)).transferFrom(
+            msg.sender,
             address(this),
-            callbackData.amountEach,
-            true
+            amountEach
         );
-
-        return "";
     }
 
     // Swapping
