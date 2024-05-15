@@ -4,3 +4,8 @@ out = "out"
 libs = ["lib"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+solc_version = '0.8.25'
+evm_version = "cancun"  # hard fork that enabled EIP-1153
+optimizer_runs = 800
+via_ir = false
+ffi = true
