@@ -5,7 +5,6 @@ import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {CurrencySettleTake} from "v4-core/libraries/CurrencySettleTake.sol";
-import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {BaseHook} from "./forks/BaseHook.sol";
