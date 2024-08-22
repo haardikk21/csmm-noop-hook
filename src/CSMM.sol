@@ -135,38 +135,61 @@ contract CSMM is BaseHook {
             : uint256(-params.amountSpecified);
 
         /**
-            BalanceDelta is a packed value of (currency0Amount, currency1Amount)
+        BalanceDelta is a packed value of (currency0Amount, currency1Amount)
 
-            BeforeSwapDelta varies such that it is not sorted by token0 and token1
-            Instead, it is sorted by "specifiedCurrency" and "unspecifiedCurrency"
+        BeforeSwapDelta varies such that it is not sorted by token0 and token1
+        Instead, it is sorted by "specifiedCurrency" and "unspecifiedCurrency"
 
-            Specified Currency => The currency in which the user is specifying the amount they're swapping for
-            Unspecified Currency => The other currency
+        Specified Currency => The currency in which the user is specifying the amount they're swapping for
+        Unspecified Currency => The other currency
 
-            For example, in an ETH/USDC pool, there are 4 possible swap cases:
+        For example, in an ETH/USDC pool, there are 4 possible swap cases:
 
-            1. ETH for USDC with Exact Input for Output (amountSpecified = negative value representing ETH)
-            2. ETH for USDC with Exact Output for Input (amountSpecified = positive value representing USDC)
-            3. USDC for ETH with Exact Input for Output (amountSpecified = negative value representing USDC)
-            4. USDC for ETH with Exact Output for Input (amountSpecified = positive value representing ETH)
+        1. ETH for USDC with Exact Input for Output (amountSpecified = negative value representing ETH)
+        2. ETH for USDC with Exact Output for Input (amountSpecified = positive value representing USDC)
+        3. USDC for ETH with Exact Input for Output (amountSpecified = negative value representing USDC)
+        4. USDC for ETH with Exact Output for Input (amountSpecified = positive value representing ETH)
 
-            In Case (1):
-                -> the user is specifying their swap amount in terms of ETH, so the specifiedCurrency is ETH
-                -> the unspecifiedCurrency is USDC
+        In Case (1):
+            -> the user is specifying their swap amount in terms of ETH, so the specifiedCurrency is ETH
+            -> the unspecifiedCurrency is USDC
 
-            In Case (2):
-                -> the user is specifying their swap amount in terms of USDC, so the specifiedCurrency is USDC
-                -> the unspecifiedCurrency is ETH
+        In Case (2):
+            -> the user is specifying their swap amount in terms of USDC, so the specifiedCurrency is USDC
+            -> the unspecifiedCurrency is ETH
 
-            In Case (3):
-                -> the user is specifying their swap amount in terms of USDC, so the specifiedCurrency is USDC
-                -> the unspecifiedCurrency is ETH
+        In Case (3):
+            -> the user is specifying their swap amount in terms of USDC, so the specifiedCurrency is USDC
+            -> the unspecifiedCurrency is ETH
 
-            In Case (4):
-                -> the user is specifying their swap amount in terms of ETH, so the specifiedCurrency is ETH
-                -> the unspecifiedCurrency is USDC
+        In Case (4):
+            -> the user is specifying their swap amount in terms of ETH, so the specifiedCurrency is ETH
+            -> the unspecifiedCurrency is USDC
+    
+        -------
         
-         */
+        Assume zeroForOne = true (without loss of generality)
+        Assume abs(amountSpecified) = 100
+
+        For an exact input swap where amountSpecified is negative (-100)
+            -> specified token = token0
+            -> unspecified token = token1
+            -> we set deltaSpecified = -(-100) = 100
+            -> we set deltaUnspecified = -100
+            -> i.e. hook is owed 100 specified token (token0) by PM (that comes from the user)
+            -> and hook owes 100 unspecified token (token1) to PM (to go to the user)
+    
+        For an exact output swap where amountSpecified is positive (100)
+            -> specified token = token1
+            -> unspecified token = token0
+            -> we set deltaSpecified = -100
+            -> we set deltaUnspecified = 100
+            -> i.e. hook owes 100 specified token (token1) to PM (to go to the user)
+            -> and hook is owed 100 unspecified token (token0) by PM (that comes from the user)
+
+        In either case, we can design BeforeSwapDelta as (-params.amountSpecified, params.amountSpecified)
+    
+    */
 
         BeforeSwapDelta beforeSwapDelta = toBeforeSwapDelta(
             int128(-params.amountSpecified), // So `specifiedAmount` = +100

@@ -44,7 +44,7 @@ contract CSMMTest is Test, Deployers {
             ZERO_BYTES
         );
 
-        // Add some initial liquidity
+        // Add some initial liquidity through the custom `addLiquidity` function
         IERC20Minimal(Currency.unwrap(key.currency0)).approve(
             hookAddress,
             1000 ether
