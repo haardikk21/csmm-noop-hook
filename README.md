@@ -38,10 +38,6 @@ For example, if a user wants to do an exact input swap for selling 1 Token A for
 
 It is possible for `beforeSwap` for example to only consume portion of the Token A - perhaps 0.5 Token A - and leave the remaining 0.5 Token A to go through the regular PM swap function. This is useful for example if the hook wants to charge "custom fees" for some services it is performing that it keeps for itself (not LP fee and not protocol fee).
 
-### Setting Up
-
-- Install `v4-core` instead of `v4-periphery`, as `v4-periphery` hasn't been updated to latest `v4-core` yet.
-
 ### Flow
 
 The hook acts as a middleman between the User and the Pool Manager.

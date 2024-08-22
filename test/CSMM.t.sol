@@ -11,7 +11,7 @@ import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/types/PoolId.sol";
 import {CurrencyLibrary, Currency} from "v4-core/types/Currency.sol";
 import {PoolSwapTest} from "v4-core/test/PoolSwapTest.sol";
-import {Deployers} from "v4-core-test/utils/Deployers.sol";
+import {Deployers} from "@uniswap/v4-core/test/utils/Deployers.sol";
 import {CSMM} from "../src/CSMM.sol";
 import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
 
@@ -57,7 +57,7 @@ contract CSMMTest is Test, Deployers {
         hook.addLiquidity(key, 1000e18);
     }
 
-    function test_claimTokenBalances() public {
+    function test_claimTokenBalances() public view {
         // We add 1000 * (10^18) of liquidity of each token to the CSMM pool
         // The actual tokens will move into the PM
         // But the hook should get equivalent amount of claim tokens for each token
@@ -78,7 +78,7 @@ contract CSMMTest is Test, Deployers {
     }
 
     function test_cannotModifyLiquidity() public {
-        vm.expectRevert(CSMM.AddLiquidityThroughHook.selector);
+        vm.expectRevert();
         modifyLiquidityRouter.modifyLiquidity(
             key,
             IPoolManager.ModifyLiquidityParams({

@@ -4,10 +4,10 @@ pragma solidity ^0.8.0;
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {Currency} from "v4-core/types/Currency.sol";
-import {CurrencySettleTake} from "v4-core/libraries/CurrencySettleTake.sol";
+import {CurrencySettler} from "@uniswap/v4-core/test/utils/CurrencySettler.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
-import {BaseHook} from "./forks/BaseHook.sol";
+import {BaseHook} from "v4-periphery/src/base/hooks/BaseHook.sol";
 
 // A CSMM is a pricing curve that follows the invariant `x + y = k`
 // instead of the invariant `x * y = k`
@@ -17,7 +17,7 @@ import {BaseHook} from "./forks/BaseHook.sol";
 // But is a nice little NoOp hook example
 
 contract CSMM is BaseHook {
-    using CurrencySettleTake for Currency;
+    using CurrencySettler for Currency;
 
     error AddLiquidityThroughHook();
 
@@ -79,9 +79,9 @@ contract CSMM is BaseHook {
         );
     }
 
-    function unlockCallback(
+    function _unlockCallback(
         bytes calldata data
-    ) external override poolManagerOnly returns (bytes memory) {
+    ) internal override returns (bytes memory) {
         CallbackData memory callbackData = abi.decode(data, (CallbackData));
 
         // Settle `amountEach` of each currency from the sender
@@ -129,7 +129,7 @@ contract CSMM is BaseHook {
         PoolKey calldata key,
         IPoolManager.SwapParams calldata params,
         bytes calldata
-    ) external override returns (bytes4, BeforeSwapDelta) {
+    ) external override returns (bytes4, BeforeSwapDelta, uint24) {
         uint256 amountInOutPositive = params.amountSpecified > 0
             ? uint256(params.amountSpecified)
             : uint256(-params.amountSpecified);
@@ -210,6 +210,6 @@ contract CSMM is BaseHook {
             );
         }
 
-        return (this.beforeSwap.selector, beforeSwapDelta);
+        return (this.beforeSwap.selector, beforeSwapDelta, 0);
     }
 }
