@@ -3,11 +3,12 @@ pragma solidity ^0.8.0;
 
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
+import {PoolId} from "v4-core/types/PoolId.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {CurrencySettler} from "@uniswap/v4-core/test/utils/CurrencySettler.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
-import {BaseHook} from "v4-periphery/src/base/hooks/BaseHook.sol";
+import {BaseHook} from "v4-periphery/src/utils/BaseHook.sol";
 
 // A CSMM is a pricing curve that follows the invariant `x + y = k`
 // instead of the invariant `x * y = k`
@@ -20,6 +21,22 @@ contract CSMM is BaseHook {
     using CurrencySettler for Currency;
 
     error AddLiquidityThroughHook();
+
+    event HookSwap(
+        bytes32 indexed id, // v4 pool id
+        address indexed sender, // router of the swap
+        int128 amount0,
+        int128 amount1,
+        uint128 hookLPfeeAmount0,
+        uint128 hookLPfeeAmount1
+    );
+
+    event HookModifyLiquidity(
+        bytes32 indexed id, // v4 pool id
+        address indexed sender, // router address
+        int128 amount0,
+        int128 amount1
+    );
 
     struct CallbackData {
         uint256 amountEach;
@@ -56,12 +73,12 @@ contract CSMM is BaseHook {
     }
 
     // Disable adding liquidity through the PM
-    function beforeAddLiquidity(
+    function _beforeAddLiquidity(
         address,
         PoolKey calldata,
         IPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
-    ) external pure override returns (bytes4) {
+    ) internal pure override returns (bytes4) {
         revert AddLiquidityThroughHook();
     }
 
@@ -77,11 +94,18 @@ contract CSMM is BaseHook {
                 )
             )
         );
+
+        emit HookModifyLiquidity(
+            PoolId.unwrap(key.toId()),
+            address(this),
+            int128(uint128(amountEach)),
+            int128(uint128(amountEach))
+        );
     }
 
     function _unlockCallback(
         bytes calldata data
-    ) internal override returns (bytes memory) {
+    ) internal onlyPoolManager returns (bytes memory) {
         CallbackData memory callbackData = abi.decode(data, (CallbackData));
 
         // Settle `amountEach` of each currency from the sender
@@ -124,12 +148,12 @@ contract CSMM is BaseHook {
     }
 
     // Swapping
-    function beforeSwap(
-        address,
+    function _beforeSwap(
+        address sender,
         PoolKey calldata key,
         IPoolManager.SwapParams calldata params,
         bytes calldata
-    ) external override returns (bytes4, BeforeSwapDelta, uint24) {
+    ) internal override returns (bytes4, BeforeSwapDelta, uint24) {
         uint256 amountInOutPositive = params.amountSpecified > 0
             ? uint256(params.amountSpecified)
             : uint256(-params.amountSpecified);
@@ -218,6 +242,15 @@ contract CSMM is BaseHook {
                 amountInOutPositive,
                 true
             );
+
+            emit HookSwap(
+                PoolId.unwrap(key.toId()),
+                sender,
+                -int128(uint128(amountInOutPositive)),
+                int128(uint128(amountInOutPositive)),
+                0,
+                0
+            );
         } else {
             key.currency0.settle(
                 poolManager,
@@ -230,6 +263,15 @@ contract CSMM is BaseHook {
                 address(this),
                 amountInOutPositive,
                 true
+            );
+
+            emit HookSwap(
+                PoolId.unwrap(key.toId()),
+                sender,
+                int128(uint128(amountInOutPositive)),
+                -int128(uint128(amountInOutPositive)),
+                0,
+                0
             );
         }
 

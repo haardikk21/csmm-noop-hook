@@ -35,14 +35,7 @@ contract CSMMTest is Test, Deployers {
         deployCodeTo("CSMM.sol", abi.encode(manager), hookAddress);
         hook = CSMM(hookAddress);
 
-        (key, ) = initPool(
-            currency0,
-            currency1,
-            hook,
-            3000,
-            SQRT_PRICE_1_1,
-            ZERO_BYTES
-        );
+        (key, ) = initPool(currency0, currency1, hook, 3000, SQRT_PRICE_1_1);
 
         // Add some initial liquidity through the custom `addLiquidity` function
         IERC20Minimal(Currency.unwrap(key.currency0)).approve(
