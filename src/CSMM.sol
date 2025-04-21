@@ -103,9 +103,9 @@ contract CSMM is BaseHook {
         );
     }
 
-    function _unlockCallback(
+    function unlockCallback(
         bytes calldata data
-    ) internal onlyPoolManager returns (bytes memory) {
+    ) external onlyPoolManager returns (bytes memory) {
         CallbackData memory callbackData = abi.decode(data, (CallbackData));
 
         // Settle `amountEach` of each currency from the sender
