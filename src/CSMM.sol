@@ -9,9 +9,11 @@ import {CurrencySettler} from "@uniswap/v4-core/test/utils/CurrencySettler.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {BaseHook} from "v4-periphery/src/utils/BaseHook.sol";
+import {ModifyLiquidityParams, SwapParams} from "v4-core/types/PoolOperation.sol";
 
 // A CSMM is a pricing curve that follows the invariant `x + y = k`
 // instead of the invariant `x * y = k`
+// This is a super simple CSMM PoC that hardcodes 1:1 swaps through a custom pricing curve hook
 
 // This is theoretically the ideal curve for a stablecoin or pegged pairs (stETH/ETH)
 // In practice, we don't usually see this in prod since depegs can happen and we dont want exact equal amounts
@@ -76,7 +78,7 @@ contract CSMM is BaseHook {
     function _beforeAddLiquidity(
         address,
         PoolKey calldata,
-        IPoolManager.ModifyLiquidityParams calldata,
+        ModifyLiquidityParams calldata,
         bytes calldata
     ) internal pure override returns (bytes4) {
         revert AddLiquidityThroughHook();
@@ -151,12 +153,10 @@ contract CSMM is BaseHook {
     function _beforeSwap(
         address sender,
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata params,
+        SwapParams calldata params,
         bytes calldata
     ) internal override returns (bytes4, BeforeSwapDelta, uint24) {
-        uint256 amountInOutPositive = params.amountSpecified > 0
-            ? uint256(params.amountSpecified)
-            : uint256(-params.amountSpecified);
+        bool isExactInput = params.amountSpecified < 0;
 
         /**
         BalanceDelta is a packed value of (currency0Amount, currency1Amount)
@@ -173,23 +173,6 @@ contract CSMM is BaseHook {
         2. ETH for USDC with Exact Output for Input (amountSpecified = positive value representing USDC)
         3. USDC for ETH with Exact Input for Output (amountSpecified = negative value representing USDC)
         4. USDC for ETH with Exact Output for Input (amountSpecified = positive value representing ETH)
-
-        In Case (1):
-            -> the user is specifying their swap amount in terms of ETH, so the specifiedCurrency is ETH
-            -> the unspecifiedCurrency is USDC
-
-        In Case (2):
-            -> the user is specifying their swap amount in terms of USDC, so the specifiedCurrency is USDC
-            -> the unspecifiedCurrency is ETH
-
-        In Case (3):
-            -> the user is specifying their swap amount in terms of USDC, so the specifiedCurrency is USDC
-            -> the unspecifiedCurrency is ETH
-
-        In Case (4):
-            -> the user is specifying their swap amount in terms of ETH, so the specifiedCurrency is ETH
-            -> the unspecifiedCurrency is USDC
-    
         -------
         
         Assume zeroForOne = true (without loss of generality)
@@ -212,13 +195,38 @@ contract CSMM is BaseHook {
             -> and hook is owed 100 unspecified token (token0) by PM (that comes from the user)
 
         In either case, we can design BeforeSwapDelta as (-params.amountSpecified, params.amountSpecified)
-    
-    */
+        */
 
-        BeforeSwapDelta beforeSwapDelta = toBeforeSwapDelta(
-            int128(-params.amountSpecified), // So `specifiedAmount` = +100
-            int128(params.amountSpecified) // Unspecified amount (output delta) = -100
-        );
+        int128 absInputAmount;
+        int128 absOutputAmount;
+        BeforeSwapDelta beforeSwapDelta;
+        if (isExactInput) {
+            absInputAmount = int128(-params.amountSpecified);
+            absOutputAmount = absInputAmount; // exactly 1:1
+
+            // If you wanted to charge fees here, reduce absOutputAmount a little bit
+            // i.e. if user is giving you 100 A, "spot price" would have them get back 100 B.
+            // Instead, if you give back 99B - that's effectively a 1% fee
+            // absOutputAmount = (absOutputAmount * 99) / 100;
+
+            beforeSwapDelta = toBeforeSwapDelta(
+                absInputAmount, // abs(params.amountSpecified) of input token owed from uniswap to hook
+                -absOutputAmount // -abs(params.amountSpecified) i.e. params.amountSpecified of output token owed from hook to uniswap
+            );
+        } else {
+            absOutputAmount = int128(params.amountSpecified);
+            absInputAmount = absOutputAmount; // exactly 1:1
+
+            // If you wanted to charge fees here, increase absInputAmount a little bit
+            // i.e. if user wants 100 B, "spot price" would have them give you 100 A.
+            // Instead, if you take 101A - that's effectively a 1% fee
+            // absInputAmount = (absInputAmount * 101) / 100;
+
+            beforeSwapDelta = toBeforeSwapDelta(
+                -absInputAmount, // -abs(params.amountSpecified) of output token owed from hook to uniswap
+                absOutputAmount // abs(params.amountSpecified) of input token owed from uniswap to hook
+            );
+        }
 
         if (params.zeroForOne) {
             // If user is selling Token 0 and buying Token 1
@@ -229,7 +237,7 @@ contract CSMM is BaseHook {
             key.currency0.take(
                 poolManager,
                 address(this),
-                amountInOutPositive,
+                uint256(uint128(absInputAmount)),
                 true
             );
 
@@ -239,15 +247,15 @@ contract CSMM is BaseHook {
             key.currency1.settle(
                 poolManager,
                 address(this),
-                amountInOutPositive,
+                uint256(uint128(absOutputAmount)),
                 true
             );
 
             emit HookSwap(
                 PoolId.unwrap(key.toId()),
                 sender,
-                -int128(uint128(amountInOutPositive)),
-                int128(uint128(amountInOutPositive)),
+                -absInputAmount,
+                absOutputAmount,
                 0,
                 0
             );
@@ -255,21 +263,21 @@ contract CSMM is BaseHook {
             key.currency0.settle(
                 poolManager,
                 address(this),
-                amountInOutPositive,
+                uint256(uint128(absOutputAmount)),
                 true
             );
             key.currency1.take(
                 poolManager,
                 address(this),
-                amountInOutPositive,
+                uint256(uint128(absInputAmount)),
                 true
             );
 
             emit HookSwap(
                 PoolId.unwrap(key.toId()),
                 sender,
-                int128(uint128(amountInOutPositive)),
-                -int128(uint128(amountInOutPositive)),
+                absOutputAmount,
+                -absInputAmount,
                 0,
                 0
             );

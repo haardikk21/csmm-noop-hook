@@ -14,6 +14,7 @@ import {PoolSwapTest} from "v4-core/test/PoolSwapTest.sol";
 import {Deployers} from "@uniswap/v4-core/test/utils/Deployers.sol";
 import {CSMM} from "../src/CSMM.sol";
 import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
+import {ModifyLiquidityParams, SwapParams} from "v4-core/types/PoolOperation.sol";
 
 contract CSMMTest is Test, Deployers {
     using PoolIdLibrary for PoolId;
@@ -74,7 +75,7 @@ contract CSMMTest is Test, Deployers {
         vm.expectRevert();
         modifyLiquidityRouter.modifyLiquidity(
             key,
-            IPoolManager.ModifyLiquidityParams({
+            ModifyLiquidityParams({
                 tickLower: -60,
                 tickUpper: 60,
                 liquidityDelta: 1e18,
@@ -95,7 +96,7 @@ contract CSMMTest is Test, Deployers {
         uint balanceOfTokenBBefore = key.currency1.balanceOfSelf();
         swapRouter.swap(
             key,
-            IPoolManager.SwapParams({
+            SwapParams({
                 zeroForOne: true,
                 amountSpecified: -100e18,
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
@@ -121,7 +122,7 @@ contract CSMMTest is Test, Deployers {
         uint balanceOfTokenBBefore = key.currency1.balanceOfSelf();
         swapRouter.swap(
             key,
-            IPoolManager.SwapParams({
+            SwapParams({
                 zeroForOne: true,
                 amountSpecified: 100e18,
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
